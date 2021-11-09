@@ -5,6 +5,7 @@ import {averageInStock, AvStatus, FName} from "./filmTypes";
 import {log} from "firebase-functions/lib/logger";
 // import * as faker from "faker"
 import Timestamp = firestore.Timestamp;
+import * as functions from "firebase-functions";
 
 const admin = require('firebase-admin')
 
@@ -93,7 +94,6 @@ export async function getUsersWithZip(zip: string) {
         data.id = doc.id
         users.push(data)
     })
-    console.log("users: " + users);
     return users
 }
 
@@ -105,16 +105,44 @@ export async function getUser(id: string) {
 }
 
 
-
 async function createInStockTimeStamp(store: Store) {
     const timestamp = firestore.Timestamp.now();
-    await zipDB.doc(store.parentZip).collection('dms').doc(store.storeNo).collection('stockChanges').doc(formatDate(timestamp.toDate())).set({
-        date: timestamp,
-        [FName.GOLD + "Amt"]: store.stocks.gold.amt,
-        [FName.ULTRA + "Amt"]: store.stocks.ultra.amt,
-        [FName.COLOR + "Amt"]: store.stocks.color.amt,
-        [FName.AFGA + "Amt"]: store.stocks.afga.amt
+    const timeStampEntries = zipDB.doc(store.parentZip).collection('dms').doc(store.storeNo).collection('stockChanges')
+    if (await stockHasChanged(store, timeStampEntries)) {
+        await timeStampEntries.doc(formatDate(timestamp.toDate())).set({
+            date: timestamp,
+            [FName.GOLD + "Amt"]: store.stocks.gold.amt,
+            [FName.ULTRA + "Amt"]: store.stocks.ultra.amt,
+            [FName.COLOR + "Amt"]: store.stocks.color.amt,
+            [FName.AFGA + "Amt"]: store.stocks.afga.amt
+        });
+    } else {
+        console.log("alles gleich")
+    }
+
+}
+
+async function stockHasChanged(store: Store, path: any) {
+    console.log("in stockHasChanged")
+    let querySnapshot = await path.orderBy("date", "desc").limit(1).get();
+    let lastTimeStampEntry
+
+    querySnapshot.forEach((entry: any) => {
+        functions.logger.log("data")
+        functions.logger.log(entry.data());
+        lastTimeStampEntry = entry.data()
+        console.log("last Time Stamp Entry")
     })
+    // @ts-ignore
+    functions.logger.log("is Afga the Same "+ (lastTimeStampEntry[FName.AFGA + "Amt"] == store.stocks.afga.amt))
+    // @ts-ignore
+    return !(lastTimeStampEntry[FName.AFGA + "Amt"] == store.stocks.afga.amt
+        // @ts-ignore
+        && lastTimeStampEntry[FName.ULTRA + "Amt"] == store.stocks.ultra.amt
+        // @ts-ignore
+        && lastTimeStampEntry[FName.COLOR + "Amt"] == store.stocks.color.amt
+        // @ts-ignore
+        && lastTimeStampEntry[FName.GOLD + "Amt"] == store.stocks.gold.amt);
 }
 
 function storeListToMap(snapshot: any) {
@@ -139,7 +167,7 @@ export class fireStoreDM {
 
         for (const stock of store.stocks.asArray()) {
             //TODO wenns film nicht gab und dann wieder gab was dann? ist glaub ich geklärt
-            if (stock.inStock()) {
+            if (stock.arrived()) {
                 try {
                     await zipDB.doc(store.parentZip).collection('dms')
                         .doc(store.storeNo).collection('stats')
@@ -174,16 +202,16 @@ export class fireStoreDM {
 
         for (const filmItem of store.stocks.asArray()) {
             if (filmItem.wentOut()) {
-                    await statsRef.doc("lastHad" + filmItem.name).set({
-                        date: timestamp,
-                        amt: filmItem.amt
-                    })
+                await statsRef.doc("lastHad" + filmItem.name).set({
+                    date: timestamp,
+                    amt: filmItem.amt
+                })
 
                 const firstHadSnap = await statsRef.doc("firstHad" + filmItem.name).get();
-                const date:Timestamp = firstHadSnap.data().date;
+                const date: Timestamp = firstHadSnap.data().date;
                 await statsRef.doc("firstHad" + filmItem.name).delete()
                 // const date:Date = faker.date.recent(12)
-                const difHours:number = Math.floor((Date.now()-date.toMillis())/3600000)
+                const difHours: number = Math.floor((Date.now() - date.toMillis()) / 3600000)
 
                 const avgInStock = filmItem.avgInStock;
                 if (avgInStock > 0) {
@@ -210,12 +238,12 @@ export class fireStoreDM {
 
 function hoursToMeaningfullTime(hours: number) {
     if (hours < 24) {
-        return{
-            hours:Math.floor(hours)
-        } ;
+        return {
+            hours: Math.floor(hours)
+        };
     } else {
         return {
-            days:Math.floor(hours/24)
+            days: Math.floor(hours / 24)
         }
     }
 }

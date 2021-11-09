@@ -65,9 +65,9 @@ export async function getAvailability(stores: Map<string, Store>) {
         }
     }
     const notAnymoreStores = stValues.filter(store => store.stocks.asArray().filter(stock => stock.wentOut()).length > 0)//TODO testen ob stock.has immer richtig gesetzt wird
-    console.log("not Available Anymore:")
-    console.dir(notAnymoreStores)
-    console.log("storeNummers: " + availStores)
+    // console.log("not Available Anymore:")
+    // console.dir(notAnymoreStores)
+    // console.log("storeNummers: " + availStores)
 
     return {
         availStores: [...availStores.values()],
@@ -79,8 +79,8 @@ export async function getAvailability(stores: Map<string, Store>) {
 function writeAvailToStore(stores: Map<string, Store>, availStores: Map<string, Store>, res: any) {
     for (const jStore of res.data.storeAvailability) {
         if (jStore.inStock) {
-            console.log("dan: " + res.data.dan)
-            console.log("stockLevel: " + jStore.stockLevel)
+            // console.log("dan: " + res.data.dan)
+            // console.log("stockLevel: " + jStore.stockLevel)
             // @ts-ignore
             const theStore = stores.get(jStore.store.storeNumber)
 

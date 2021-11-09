@@ -11,7 +11,7 @@ export async function updateHandeler() {
         return
     }
 
-    console.log(storeMap)
+    // console.log(storeMap)
     const stores = await getAvailability(storeMap);
     console.log("nach dm Check")
     // console.log(stores.availStores[0].stocks.afga.amt)
